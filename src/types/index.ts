@@ -14,6 +14,18 @@ export interface User {
 
 export type FreightStatus = 'pending' | 'confirmed' | 'in_transit' | 'delivered' | 'cancelled';
 
+export interface PackageItem {
+  id: string;
+  width: number;
+  height: number;
+  length: number;
+  weight: number;
+  description: string;
+  photos?: string[];
+  ownerId: string;
+  ownerName: string;
+}
+
 export interface FreightRequest {
   id: string;
   customerId: string;
@@ -52,6 +64,11 @@ export interface FreightRequest {
   requestedDate: string;
   estimatedArrival?: string;
   createdAt: string;
+  packages: PackageItem[];
+  isShared: boolean;
+  maxPackages: number;
+  currentPackages: number;
+  sharedBy?: string[];
 }
 
 export interface Message {
@@ -71,12 +88,9 @@ export interface Message {
 export interface Review {
   id: string;
   freightId: string;
-  reviewer: {
-    id: string;
-    name: string;
-    avatar?: string;
-    role: UserRole;
-  };
+  authorId: string;
+  targetId: string;
+  role: 'customer' | 'transporter';
   rating: number;
   comment: string;
   createdAt: string;

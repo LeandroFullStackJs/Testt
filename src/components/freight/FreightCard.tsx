@@ -6,13 +6,19 @@ import Card from '../ui/Card';
 import FreightStatusBadge from './FreightStatusBadge';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
+import Button from '../ui/Button';
+import { useAuth } from '../../hooks/useAuth';
 
 interface FreightCardProps {
   freight: FreightRequest;
+  onJoinFreight?: () => void;
+  isOwner?: boolean;
+  isParticipant?: boolean;
 }
 
-const FreightCard: React.FC<FreightCardProps> = ({ freight }) => {
+const FreightCard: React.FC<FreightCardProps> = ({ freight, onJoinFreight, isOwner, isParticipant }) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   
   const handleClick = () => {
     navigate(`/freight/${freight.id}`);
@@ -31,6 +37,13 @@ const FreightCard: React.FC<FreightCardProps> = ({ freight }) => {
           </h3>
           <FreightStatusBadge status={freight.status} />
         </div>
+        
+        {(isOwner || isParticipant) && (
+          <div className="mb-2">
+            {isOwner && <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mr-2">Creador</span>}
+            {isParticipant && <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded">Participante</span>}
+          </div>
+        )}
         
         <div className="space-y-2 mb-4">
           <div className="flex items-start space-x-2">
@@ -66,11 +79,16 @@ const FreightCard: React.FC<FreightCardProps> = ({ freight }) => {
           <div className="flex items-start space-x-2">
             <Package size={18} className="text-gray-500 mt-0.5 flex-shrink-0" />
             <div>
-              <p className="text-gray-800 font-medium">Paquete</p>
-              <p className="text-gray-600 text-sm">
-                {freight.packageDetails.width}x{freight.packageDetails.height}x{freight.packageDetails.length} cm, 
-                {freight.packageDetails.weight} kg
-              </p>
+              <p className="text-gray-800 font-medium">Paquetes</p>
+              {freight.packages && freight.packages.length > 0 ? (
+                freight.packages.map((pkg, idx) => (
+                  <p key={pkg.id} className="text-gray-600 text-sm">
+                    {pkg.width}x{pkg.height}x{pkg.length} cm, {pkg.weight} kg - {pkg.description}
+                  </p>
+                ))
+              ) : (
+                <p className="text-gray-600 text-sm">Sin paquetes</p>
+              )}
             </div>
           </div>
         </div>
@@ -86,6 +104,25 @@ const FreightCard: React.FC<FreightCardProps> = ({ freight }) => {
             })}
           </p>
         </div>
+        
+        {freight.isShared && (
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <div className="flex justify-between items-center">
+              <div className="text-sm text-gray-600">
+                {freight.currentPackages} de {freight.maxPackages} paquetes
+              </div>
+              {onJoinFreight && user?.role === 'customer' && freight.customerId !== user.id && freight.currentPackages < freight.maxPackages && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={e => { e.stopPropagation(); onJoinFreight(); }}
+                >
+                  Unirse al Flete
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </Card>
   );

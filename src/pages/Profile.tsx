@@ -5,6 +5,8 @@ import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
+import { useFreight } from '../hooks/useFreight';
+import mockUsers from '../data/mockUsers';
 
 const Profile: React.FC = () => {
   const { user, logout } = useAuth();
@@ -15,6 +17,8 @@ const Profile: React.FC = () => {
     email: user?.email || '',
     phone: user?.phone || '',
   });
+  
+  const { reviews } = useFreight();
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -42,6 +46,12 @@ const Profile: React.FC = () => {
       </div>
     );
   }
+  
+  const receivedReviews = reviews.filter(r => r.targetId === user?.id);
+  const customerReviews = receivedReviews.filter(r => r.role === 'customer');
+  const transporterReviews = receivedReviews.filter(r => r.role === 'transporter');
+  const avgCustomer = customerReviews.length ? (customerReviews.reduce((acc, r) => acc + r.rating, 0) / customerReviews.length).toFixed(2) : null;
+  const avgTransporter = transporterReviews.length ? (transporterReviews.reduce((acc, r) => acc + r.rating, 0) / transporterReviews.length).toFixed(2) : null;
   
   return (
     <div className="space-y-6 max-w-3xl mx-auto pb-16 md:pb-0">
@@ -233,6 +243,61 @@ const Profile: React.FC = () => {
           </div>
         </div>
       </Card>
+      
+      {/* Promedios de estrellas */}
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-2">Reputación</h2>
+        {avgCustomer && (
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-yellow-400"><Star size={18} fill="currentColor" /></span>
+            <span className="font-medium">{avgCustomer}</span>
+            <span className="text-xs text-gray-500">como Cliente</span>
+          </div>
+        )}
+        {avgTransporter && (
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-yellow-400"><Star size={18} fill="currentColor" /></span>
+            <span className="font-medium">{avgTransporter}</span>
+            <span className="text-xs text-gray-500">como Transportista</span>
+          </div>
+        )}
+        {!avgCustomer && !avgTransporter && <span className="text-gray-500">Sin calificaciones aún.</span>}
+      </div>
+      
+      {/* Listado de reseñas */}
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900 mb-2">Reseñas recibidas</h2>
+        {receivedReviews.length === 0 ? (
+          <span className="text-gray-500">Aún no tienes reseñas.</span>
+        ) : (
+          <div className="space-y-4">
+            {receivedReviews.map(r => {
+              const authorUser = mockUsers.find(u => u.id === r.authorId);
+              const authorName = authorUser ? authorUser.name : r.authorId;
+              const authorAvatar = authorUser && authorUser.avatar;
+              return (
+                <div key={r.id} className="bg-gray-50 rounded p-4 flex items-start gap-3">
+                  {authorAvatar ? (
+                    <img src={authorAvatar} alt={authorName} className="w-8 h-8 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-bold">
+                      {authorName[0]}
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      {[...Array(r.rating)].map((_, i) => <Star key={i} size={16} className="text-yellow-400" fill="currentColor" />)}
+                      <span className="text-xs text-gray-500 ml-2">{new Date(r.createdAt).toLocaleDateString()}</span>
+                    </div>
+                    <div className="text-gray-800 mb-1">{r.comment}</div>
+                    <div className="text-xs text-gray-500">De: {authorName} ({r.role === 'customer' ? 'Cliente' : 'Transportista'})</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

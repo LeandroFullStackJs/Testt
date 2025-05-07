@@ -11,15 +11,22 @@ import { useFreight } from '../../hooks/useFreight';
 import { useAuth } from '../../hooks/useAuth';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { FreightStatus } from '../../types';
+import { FreightStatus, Review } from '../../types';
 import { motion } from 'framer-motion';
+import { Tooltip } from '../../components/ui/Tooltip';
+import mockUsers from '../../data/mockUsers';
 
 const FreightDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { getFreightRequest, updateFreightStatus, acceptFreightRequest, isLoading } = useFreight();
+  const { getFreightRequest, updateFreightStatus, acceptFreightRequest, isLoading, reviews, addReview } = useFreight();
   const { user } = useAuth();
   const [activeStatus, setActiveStatus] = useState<FreightStatus | null>(null);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewTarget, setReviewTarget] = useState<string | null>(null);
+  const [reviewRole, setReviewRole] = useState<'customer' | 'transporter' | null>(null);
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
   
   const freight = getFreightRequest(id!);
   
@@ -76,6 +83,22 @@ const FreightDetails: React.FC = () => {
       setActiveStatus(null);
     }
   };
+  
+  const uniqueClients = Array.from(new Set([
+    freight.customerId,
+    ...(freight.packages || []).map(pkg => pkg.ownerId)
+  ])).filter(Boolean);
+  const uniqueClientNames = Array.from(new Set([
+    freight.customerName,
+    ...(freight.packages || []).map(pkg => pkg.ownerName)
+  ])).filter(Boolean);
+  
+  const isCurrentUser = (id: string) => user && user.id === id;
+  
+  const hasReviewedTransporter = reviews.some(r => r.freightId === freight.id && r.authorId === user?.id && r.role === 'transporter');
+  const hasReviewedAllCustomers = uniqueClients.filter(cid => cid !== freight.customerId).every(cid => reviews.some(r => r.freightId === freight.id && r.authorId === user?.id && r.targetId === cid && r.role === 'customer'));
+  
+  const freightReviews = reviews.filter(r => r.freightId === freight.id);
   
   return (
     <div className="space-y-6 pb-16 md:pb-0">
@@ -150,49 +173,47 @@ const FreightDetails: React.FC = () => {
           
           {/* Package Details Card */}
           <Card className="p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Detalles del Paquete</h2>
-            
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-              <div>
-                <p className="text-sm text-gray-500">Ancho</p>
-                <p className="font-medium text-gray-900">{freight.packageDetails.width} cm</p>
-              </div>
-              
-              <div>
-                <p className="text-sm text-gray-500">Alto</p>
-                <p className="font-medium text-gray-900">{freight.packageDetails.height} cm</p>
-              </div>
-              
-              <div>
-                <p className="text-sm text-gray-500">Largo</p>
-                <p className="font-medium text-gray-900">{freight.packageDetails.length} cm</p>
-              </div>
-              
-              <div>
-                <p className="text-sm text-gray-500">Peso</p>
-                <p className="font-medium text-gray-900">{freight.packageDetails.weight} kg</p>
-              </div>
-            </div>
-            
-            <div>
-              <p className="text-sm text-gray-500 mb-1">Descripción</p>
-              <p className="text-gray-900">{freight.packageDetails.description}</p>
-            </div>
-            
-            {freight.packageDetails.photos && freight.packageDetails.photos.length > 0 && (
-              <div className="mt-4">
-                <p className="text-sm text-gray-500 mb-2">Fotos</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {freight.packageDetails.photos.map((photo, index) => (
-                    <img 
-                      key={index}
-                      src={photo}
-                      alt={`Foto ${index + 1}`}
-                      className="rounded-md h-24 w-full object-cover"
-                    />
-                  ))}
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Detalles de los Paquetes</h2>
+            {freight.packages && freight.packages.length > 0 ? (
+              freight.packages.map((pkg, idx) => (
+                <div key={pkg.id} className={`mb-4 p-4 rounded-md ${isCurrentUser(pkg.ownerId) ? 'bg-blue-50 border-2 border-blue-300' : 'bg-gray-50'}`}>
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-2">
+                    <div>
+                      <p className="text-sm text-gray-500">Ancho</p>
+                      <p className="font-medium text-gray-900">{pkg.width} cm</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Alto</p>
+                      <p className="font-medium text-gray-900">{pkg.height} cm</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Largo</p>
+                      <p className="font-medium text-gray-900">{pkg.length} cm</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Peso</p>
+                      <p className="font-medium text-gray-900">{pkg.weight} kg</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Dueño</p>
+                      <div className="flex items-center gap-1">
+                        <p className="font-medium text-gray-900">{pkg.ownerName || 'Desconocido'}</p>
+                        {isCurrentUser(pkg.ownerId) && (
+                          <Tooltip text="Este paquete es tuyo">
+                            <span className="text-blue-600 font-bold">(Tú)</span>
+                          </Tooltip>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 mb-1">Descripción</p>
+                    <p className="text-gray-900">{pkg.description}</p>
+                  </div>
                 </div>
-              </div>
+              ))
+            ) : (
+              <div className="text-gray-500">No hay paquetes registrados.</div>
             )}
           </Card>
           
@@ -276,46 +297,27 @@ const FreightDetails: React.FC = () => {
           <Card className="p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Personas</h2>
             
-            <div className="space-y-4">
-              <div className="flex items-center">
-                <div className="flex-shrink-0 mr-3">
-                  {freight.customerAvatar ? (
-                    <img 
-                      src={freight.customerAvatar} 
-                      alt={freight.customerName}
-                      className="w-10 h-10 rounded-full"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center">
-                      <User size={20} />
-                    </div>
-                  )}
+            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+              <h3 className="font-semibold text-gray-900 mb-2">Personas</h3>
+              {uniqueClients.map((id, idx) => (
+                <div key={id} className={`flex items-center gap-2 mb-1 ${isCurrentUser(id) ? 'bg-blue-50 rounded px-1' : ''}`}>
+                  <span className="inline-block bg-gray-100 rounded-full p-1">
+                    <span className="text-primary-600 font-bold">{uniqueClientNames[idx]?.[0] || '?'}</span>
+                  </span>
+                  <span className={`text-gray-900 font-medium ${isCurrentUser(id) ? 'text-blue-700 font-bold' : ''}`}>{uniqueClientNames[idx]}{isCurrentUser(id) && ' (Tú)'}</span>
+                  <span className="text-xs text-gray-500 ml-2">
+                    {id === freight.customerId ? 'Creador' : 'Participante'}
+                  </span>
                 </div>
-                <div>
-                  <p className="font-medium text-gray-900">{freight.customerName}</p>
-                  <p className="text-sm text-gray-500">Cliente</p>
-                </div>
-              </div>
-              
+              ))}
+              {/* Transportista */}
               {freight.transporterId && (
-                <div className="flex items-center">
-                  <div className="flex-shrink-0 mr-3">
-                    {freight.transporterAvatar ? (
-                      <img 
-                        src={freight.transporterAvatar} 
-                        alt={freight.transporterName}
-                        className="w-10 h-10 rounded-full"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 bg-secondary-100 text-secondary-600 rounded-full flex items-center justify-center">
-                        <TruckIcon size={20} />
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900">{freight.transporterName}</p>
-                    <p className="text-sm text-gray-500">Transportista</p>
-                  </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="inline-block bg-secondary-100 rounded-full p-1">
+                    <TruckIcon size={16} className="text-secondary-600" />
+                  </span>
+                  <span className="text-gray-900 font-medium">{freight.transporterName}</span>
+                  <span className="text-xs text-gray-500 ml-2">Transportista</span>
                 </div>
               )}
             </div>
@@ -376,15 +378,17 @@ const FreightDetails: React.FC = () => {
                 </Button>
               )}
               
-              {isDelivered && isCustomer && (
-                <Button 
-                  variant="outline" 
-                  fullWidth
-                  icon={<Star size={18} />}
-                >
-                  Calificar Servicio
+              {isDelivered && !hasReviewedTransporter && (isCustomer || (freight.packages || []).some(pkg => pkg.ownerId === user?.id)) && (
+                <Button variant="outline" fullWidth icon={<Star size={18} />} onClick={() => { setShowReviewModal(true); setReviewTarget(freight.transporterId || null); setReviewRole('transporter'); }}>
+                  Calificar al transportista
                 </Button>
               )}
+              
+              {isDelivered && isTransporter && !hasReviewedAllCustomers && uniqueClients.filter(cid => cid !== freight.transporterId).map(cid => (
+                <Button key={cid} variant="outline" fullWidth icon={<Star size={18} />} onClick={() => { setShowReviewModal(true); setReviewTarget(cid || null); setReviewRole('customer'); }}>
+                  Calificar a {uniqueClientNames[uniqueClients.indexOf(cid)]}
+                </Button>
+              ))}
               
               {canCancel && (
                 <Button 
@@ -402,6 +406,85 @@ const FreightDetails: React.FC = () => {
           </Card>
         </div>
       </div>
+      
+      {/* Sección de reseñas del flete */}
+      <div className="mt-8">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Reseñas de este flete</h2>
+        {freightReviews.length === 0 ? (
+          <span className="text-gray-500">Aún no hay reseñas para este flete.</span>
+        ) : (
+          <div className="space-y-4">
+            {freightReviews.map(r => {
+              const authorUser = mockUsers.find(u => u.id === r.authorId);
+              const targetUser = mockUsers.find(u => u.id === r.targetId);
+              const authorName = authorUser ? authorUser.name : r.authorId;
+              const targetName = targetUser ? targetUser.name : r.targetId;
+              const authorAvatar = authorUser && authorUser.avatar;
+              const targetAvatar = targetUser && targetUser.avatar;
+              return (
+                <div key={r.id} className="bg-gray-50 rounded p-4 flex items-start gap-3">
+                  {authorAvatar ? (
+                    <img src={authorAvatar} alt={authorName} className="w-8 h-8 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-bold">{authorName[0]}</div>
+                  )}
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      {[...Array(r.rating)].map((_, i) => <Star key={i} size={16} className="text-yellow-400" fill="currentColor" />)}
+                      <span className="text-xs text-gray-500 ml-2">{new Date(r.createdAt).toLocaleDateString()}</span>
+                    </div>
+                    <div className="text-gray-800 mb-1">{r.comment}</div>
+                    <div className="text-xs text-gray-500 flex items-center gap-1">
+                      De: <span className="font-medium text-gray-900">{authorName}</span>
+                      <span className="mx-1">→</span>
+                      {targetAvatar ? (
+                        <img src={targetAvatar} alt={targetName} className="w-6 h-6 rounded-full object-cover inline-block" />
+                      ) : (
+                        <span className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-bold inline-block">{targetName[0]}</span>
+                      )}
+                      <span className="font-medium text-gray-900">{targetName}</span>
+                      <span className="ml-1">({r.role === 'customer' ? 'Cliente' : 'Transportista'})</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      
+      {/* Modal de reseña */}
+      {showReviewModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-lg">
+            <h2 className="text-xl font-semibold mb-4">Deja tu reseña</h2>
+            <div className="flex items-center mb-4">
+              {[1,2,3,4,5].map(star => (
+                <span key={star} className={`cursor-pointer text-2xl ${star <= rating ? 'text-yellow-400' : 'text-gray-300'}`} onClick={() => setRating(star)}>&#9733;</span>
+              ))}
+            </div>
+            <textarea className="w-full border rounded p-2 mb-4" rows={3} placeholder="Escribe un comentario..." value={comment} onChange={e => setComment(e.target.value)} />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowReviewModal(false)}>Cancelar</Button>
+              <Button variant="primary" onClick={() => {
+                if (rating > 0 && reviewTarget && reviewRole) {
+                  addReview({
+                    freightId: freight.id,
+                    authorId: user!.id,
+                    targetId: reviewTarget,
+                    role: reviewRole,
+                    rating,
+                    comment,
+                  });
+                  setShowReviewModal(false);
+                  setRating(0);
+                  setComment('');
+                }
+              }}>Enviar</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

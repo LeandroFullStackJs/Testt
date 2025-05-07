@@ -1,16 +1,21 @@
 import React, { createContext, useState, useEffect } from 'react';
-import { FreightRequest, FreightStatus } from '../types';
+import { FreightRequest, FreightStatus, Review } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import mockFreightRequests from '../data/mockFreightRequests';
 
 interface FreightContextType {
   freightRequests: FreightRequest[];
+  setFreightRequests: React.Dispatch<React.SetStateAction<FreightRequest[]>>;
   isLoading: boolean;
   error: Error | null;
   getFreightRequest: (id: string) => FreightRequest | undefined;
   createFreightRequest: (freightRequest: Omit<FreightRequest, 'id' | 'status' | 'customerName' | 'customerAvatar' | 'createdAt'>) => Promise<FreightRequest>;
   updateFreightStatus: (id: string, status: FreightStatus) => Promise<FreightRequest>;
   acceptFreightRequest: (id: string) => Promise<FreightRequest>;
+  joinFreightRequest: (freightId: string) => Promise<void>;
+  joiningFreightId: string | null;
+  reviews: Review[];
+  addReview: (review: Omit<Review, 'id' | 'createdAt'>) => void;
 }
 
 export const FreightContext = createContext<FreightContextType | null>(null);
@@ -20,6 +25,8 @@ export const FreightProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [freightRequests, setFreightRequests] = useState<FreightRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [joiningFreightId, setJoiningFreightId] = useState<string | null>(null);
+  const [reviews, setReviews] = useState<Review[]>([]);
 
   useEffect(() => {
     // Load freight requests
@@ -149,16 +156,43 @@ export const FreightProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  const joinFreightRequest = async (freightId: string) => {
+    if (!user) throw new Error('Debes iniciar sesión para unirte a un flete');
+    const index = freightRequests.findIndex(f => f.id === freightId);
+    if (index === -1) throw new Error('Flete no encontrado');
+    const freight = freightRequests[index];
+    if (!freight.isShared || freight.currentPackages >= freight.maxPackages) {
+      throw new Error('No se puede unir a este flete');
+    }
+    setJoiningFreightId(freightId);
+  };
+
+  const addReview = (review: Omit<Review, 'id' | 'createdAt'>) => {
+    setReviews(prev => [
+      {
+        ...review,
+        id: `review-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+      },
+      ...prev
+    ]);
+  };
+
   return (
     <FreightContext.Provider
       value={{
         freightRequests,
+        setFreightRequests,
         isLoading,
         error,
         getFreightRequest,
         createFreightRequest,
         updateFreightStatus,
         acceptFreightRequest,
+        joinFreightRequest,
+        joiningFreightId,
+        reviews,
+        addReview,
       }}
     >
       {children}

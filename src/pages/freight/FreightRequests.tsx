@@ -1,48 +1,83 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Plus, ArrowDownUp, Search, FilterX } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import FreightCard from '../../components/freight/FreightCard';
 import { useFreight } from '../../hooks/useFreight';
 import { useAuth } from '../../hooks/useAuth';
-import { FreightStatus } from '../../types';
+import { FreightStatus, FreightRequest } from '../../types';
 
 type SortOption = 'recent' | 'price-low' | 'price-high' | 'distance';
 
 const FreightRequests: React.FC = () => {
-  const { freightRequests, isLoading } = useFreight();
+  const { freightRequests, isLoading, joinFreightRequest } = useFreight();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<FreightStatus | 'all'>('all');
   const [sortOption, setSortOption] = useState<SortOption>('recent');
   const [showFilters, setShowFilters] = useState(false);
   
+  // Divide los fletes en dos listas para el cliente
+  let ownFreights: FreightRequest[] = [];
+  let sharedFreights: FreightRequest[] = [];
+  if (user?.role === 'customer') {
+    ownFreights = freightRequests.filter(freight =>
+      freight.customerId === user.id ||
+      (freight.isShared && (freight.packages || []).some(pkg => pkg.ownerId === user.id))
+    );
+    sharedFreights = freightRequests.filter(freight =>
+      freight.isShared &&
+      freight.customerId !== user.id &&
+      freight.currentPackages < freight.maxPackages &&
+      !(freight.packages || []).some(pkg => pkg.ownerId === user.id) &&
+      (statusFilter === 'all' || freight.status === statusFilter) &&
+      (
+        !searchTerm ||
+        freight.pickup.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        freight.delivery.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        freight.pickup.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        freight.delivery.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (freight.packages || []).map(pkg => pkg.description.toLowerCase()).join(' ').includes(searchTerm.toLowerCase())
+      )
+    );
+  }
+  
   // Filter freights based on user type
   const filteredFreights = freightRequests.filter(freight => {
-    // Filter by user role
+    // Filtro para clientes
     if (user?.role === 'customer') {
-      if (freight.customerId !== user.id) return false;
+      // Mostrar fletes compartidos de otros clientes a los que aún se puede unir
+      if (freight.isShared && freight.customerId !== user.id && freight.currentPackages < freight.maxPackages) {
+        return true;
+      }
+      // Mostrar los propios pedidos
+      if (freight.customerId === user.id) return true;
+      return false;
     } else if (user?.role === 'transporter') {
       if (freight.transporterId && freight.transporterId !== user.id) return false;
     }
-    
-    // Filter by status
+    // Filtro por estado
     if (statusFilter !== 'all' && freight.status !== statusFilter) return false;
-    
-    // Filter by search term
+    // Filtro por búsqueda
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
+      // Buscar en todos los paquetes
+      const packageDescriptions = (freight.packages || []).map(pkg => pkg.description.toLowerCase()).join(' ');
       return (
         freight.pickup.city.toLowerCase().includes(searchLower) ||
         freight.delivery.city.toLowerCase().includes(searchLower) ||
         freight.pickup.address.toLowerCase().includes(searchLower) ||
         freight.delivery.address.toLowerCase().includes(searchLower) ||
-        freight.packageDetails.description.toLowerCase().includes(searchLower)
+        packageDescriptions.includes(searchLower)
       );
     }
-    
-    return true;
+    // Mostrar fletes compartidos disponibles para transportistas
+    if (freight.isShared && freight.currentPackages < freight.maxPackages) {
+      return true;
+    }
+    return false;
   });
   
   // Sort freights
@@ -66,32 +101,33 @@ const FreightRequests: React.FC = () => {
     setStatusFilter('all');
     setSortOption('recent');
   };
+
+  const handleJoinFreight = async (freightId: string) => {
+    try {
+      await joinFreightRequest(freightId);
+      navigate(`/freight/${freightId}/join`);
+    } catch (error) {
+      console.error('Error al unirse al flete:', error);
+    }
+  };
   
   return (
     <div className="space-y-6 pb-16 md:pb-0">
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              {user?.role === 'customer' ? 'Mis Solicitudes de Flete' : 'Solicitudes Disponibles'}
-            </h1>
-            <p className="text-gray-600 mt-1">
-              {user?.role === 'customer' 
-                ? 'Gestiona tus solicitudes de flete' 
-                : 'Explora las solicitudes disponibles para aceptar'}
-            </p>
-          </div>
-          
-          {user?.role === 'customer' && (
-            <Link to="/freight/new">
-              <Button variant="primary" icon={<Plus size={18} />}>
-                Solicitar nuevo flete
-              </Button>
-            </Link>
-          )}
+      <div className="bg-white rounded-lg shadow-md p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {user?.role === 'customer' ? 'Solicitudes de Flete' : 'Solicitudes Disponibles'}
+          </h1>
+          <p className="text-gray-600 mt-1">
+            {user?.role === 'customer' 
+              ? 'Gestiona tus solicitudes de flete o únete a un flete compartido' 
+              : 'Explora las solicitudes disponibles para aceptar'}
+          </p>
         </div>
+        <Link to="/freight/new">
+          <Button variant="primary" icon={<Plus size={18} />}>Solicitar nuevo flete</Button>
+        </Link>
       </div>
-      
       <div className="bg-white rounded-lg shadow-md p-6">
         <div className="flex flex-col md:flex-row gap-4 mb-4">
           <div className="flex-grow">
@@ -169,21 +205,49 @@ const FreightRequests: React.FC = () => {
           <div className="text-center py-10">
             <p>Cargando solicitudes...</p>
           </div>
-        ) : sortedFreights.length === 0 ? (
-          <div className="text-center py-10">
-            <p className="text-gray-600 mb-4">No se encontraron solicitudes de flete.</p>
-            {user?.role === 'customer' && (
-              <Link to="/freight/new">
-                <Button variant="primary" icon={<Plus size={18} />}>
-                  Solicitar nuevo flete
-                </Button>
-              </Link>
+        ) : user?.role === 'customer' ? (
+          <>
+            {/* Sección de propios */}
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Mis Solicitudes de Flete</h2>
+            {ownFreights.length === 0 ? (
+              <div className="text-gray-600 mb-8">No tienes solicitudes de flete propias.</div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+                {ownFreights.map(freight => (
+                  <FreightCard 
+                    key={freight.id} 
+                    freight={freight}
+                    isOwner={freight.customerId === user.id}
+                    isParticipant={freight.customerId !== user.id}
+                  />
+                ))}
+              </div>
             )}
-          </div>
+            {/* Sección de compartidos */}
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Fletes Compartidos Disponibles</h2>
+            {sharedFreights.length === 0 ? (
+              <div className="text-gray-600">No hay fletes compartidos disponibles para unirse.</div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {sharedFreights.map(freight => (
+                  <FreightCard 
+                    key={freight.id} 
+                    freight={freight}
+                    onJoinFreight={freight.isShared ? () => handleJoinFreight(freight.id) : undefined}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         ) : (
+          // Transportistas y otros roles ven la lista normal
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {sortedFreights.map(freight => (
-              <FreightCard key={freight.id} freight={freight} />
+              <FreightCard 
+                key={freight.id} 
+                freight={freight}
+                onJoinFreight={freight.isShared ? () => handleJoinFreight(freight.id) : undefined}
+              />
             ))}
           </div>
         )}

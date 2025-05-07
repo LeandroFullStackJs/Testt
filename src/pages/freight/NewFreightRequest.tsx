@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { MapPin, ArrowLeft, ArrowRight, Package, Calendar, DollarSign } from 'lucide-react';
+import { MapPin, ArrowLeft, ArrowRight, Package, Calendar, DollarSign, Plus, Trash2 } from 'lucide-react';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import { useFreight } from '../../hooks/useFreight';
-import { FreightRequest } from '../../types';
+import { FreightRequest, PackageItem } from '../../types';
 import { motion } from 'framer-motion';
+import { useAuth } from '../../hooks/useAuth';
 
 type FormStep = 'locations' | 'package' | 'schedule' | 'review';
 
@@ -30,6 +31,7 @@ interface FormData {
 }
 
 const NewFreightRequest: React.FC = () => {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { createFreightRequest, isLoading } = useFreight();
   const [currentStep, setCurrentStep] = useState<FormStep>('locations');
@@ -51,19 +53,30 @@ const NewFreightRequest: React.FC = () => {
     },
     requestedDate: new Date().toISOString().split('T')[0],
   });
+  const [packages, setPackages] = useState<PackageItem[]>([]);
+  const [isShared, setIsShared] = useState(false);
+  const [maxPackages, setMaxPackages] = useState(1);
   
   const updateFormData = (
     field: keyof FormData,
     subfield: string,
     value: string | number
   ) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: {
-        ...prev[field],
-        [subfield]: value,
-      },
-    }));
+    setFormData(prev => {
+      if (field === 'requestedDate') {
+        return {
+          ...prev,
+          requestedDate: value as string
+        };
+      }
+      return {
+        ...prev,
+        [field]: {
+          ...(prev[field] as Record<string, any>),
+          [subfield]: value,
+        },
+      };
+    });
   };
   
   const isLocationsStepValid = () => {
@@ -76,12 +89,13 @@ const NewFreightRequest: React.FC = () => {
   };
   
   const isPackageStepValid = () => {
-    return (
-      formData.packageDetails.width > 0 &&
-      formData.packageDetails.height > 0 &&
-      formData.packageDetails.length > 0 &&
-      formData.packageDetails.weight > 0 &&
-      formData.packageDetails.description.trim() !== ''
+    if (packages.length === 0) return false;
+    return packages.every(pkg =>
+      pkg.width > 0 &&
+      pkg.height > 0 &&
+      pkg.length > 0 &&
+      pkg.weight > 0 &&
+      pkg.description.trim() !== ''
     );
   };
   
@@ -125,10 +139,14 @@ const NewFreightRequest: React.FC = () => {
       const totalPrice = Math.round(basePrice + distancePrice);
       
       const newFreight: Omit<FreightRequest, 'id' | 'status' | 'customerName' | 'customerAvatar' | 'createdAt'> = {
-        customerId: '',
+        customerId: user?.id || '',
         pickup: formData.pickup,
         delivery: formData.delivery,
+        packages: packages,
         packageDetails: formData.packageDetails,
+        isShared: isShared,
+        maxPackages: isShared ? 5 : 1,
+        currentPackages: packages.length,
         price: totalPrice,
         distance,
         requestedDate: new Date(formData.requestedDate).toISOString(),
@@ -143,23 +161,52 @@ const NewFreightRequest: React.FC = () => {
   
   // Calculate estimated price
   const calculateEstimatedPrice = () => {
-    const { width, height, length, weight } = formData.packageDetails;
-    if (width <= 0 || height <= 0 || length <= 0 || weight <= 0) {
-      return 0;
-    }
-    
-    const volume = width * height * length;
-    const basePrice = Math.max(500, volume / 1000 * 10);
-    
-    // Assuming average distance of 10km
-    const distancePrice = 10 * 30;
-    return Math.round(basePrice + distancePrice);
+    if (packages.length === 0) return 0;
+    let total = 0;
+    packages.forEach(pkg => {
+      if (pkg.width > 0 && pkg.height > 0 && pkg.length > 0 && pkg.weight > 0) {
+        const volume = pkg.width * pkg.height * pkg.length;
+        const basePrice = Math.max(500, volume / 1000 * 10);
+        // Suponiendo distancia promedio de 10km por paquete
+        const distancePrice = 10 * 30;
+        total += Math.round(basePrice + distancePrice);
+      }
+    });
+    return total;
   };
   
   const estimatedPrice = calculateEstimatedPrice();
-  
+
+  // Función para agregar un nuevo paquete
+  const addPackage = () => {
+    const newPackage: PackageItem = {
+      id: `package-${Date.now()}`,
+      width: 0,
+      height: 0,
+      length: 0,
+      weight: 0,
+      description: '',
+      ownerId: user?.id || '',
+      ownerName: user?.name || '',
+    };
+    setPackages([...packages, newPackage]);
+  };
+
+  // Función para eliminar un paquete
+  const removePackage = (packageId: string) => {
+    setPackages(packages.filter(pkg => pkg.id !== packageId));
+  };
+
+  const updatePackage = (index: number, field: keyof PackageItem, value: string | number) => {
+    setPackages(prev =>
+      prev.map((pkg, i) =>
+        i === index ? { ...pkg, [field]: value } : pkg
+      )
+    );
+  };
+
   return (
-    <div className="max-w-2xl mx-auto pb-16 md:pb-0">
+    <div className="max-w-2xl mx-auto pb-16 md:pb-0 px-4 sm:px-6">
       <div className="flex items-center mb-6">
         <Link to="/freight" className="text-gray-500 hover:text-primary-600 mr-2">
           <ArrowLeft size={20} />
@@ -266,7 +313,7 @@ const NewFreightRequest: React.FC = () => {
         </div>
       </div>
       
-      <Card className="p-6">
+      <Card className="p-4 sm:p-6">
         {currentStep === 'locations' && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -331,56 +378,95 @@ const NewFreightRequest: React.FC = () => {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <h2 className="text-xl font-semibold text-gray-900 mb-6">
-              Detalles del Paquete
-            </h2>
-            
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">
+                Detalles de los Paquetes
+              </h2>
+              <Button
+                variant="outline"
+                onClick={addPackage}
+                icon={<Plus size={18} />}
+              >
+                Agregar Paquete
+              </Button>
+            </div>
+
             <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <Input
-                  label="Ancho (cm)"
-                  type="number"
-                  value={formData.packageDetails.width || ''}
-                  onChange={(e) => updateFormData('packageDetails', 'width', Number(e.target.value))}
-                  fullWidth
-                />
-                
-                <Input
-                  label="Alto (cm)"
-                  type="number"
-                  value={formData.packageDetails.height || ''}
-                  onChange={(e) => updateFormData('packageDetails', 'height', Number(e.target.value))}
-                  fullWidth
-                />
-                
-                <Input
-                  label="Largo (cm)"
-                  type="number"
-                  value={formData.packageDetails.length || ''}
-                  onChange={(e) => updateFormData('packageDetails', 'length', Number(e.target.value))}
-                  fullWidth
-                />
-                
-                <Input
-                  label="Peso (kg)"
-                  type="number"
-                  value={formData.packageDetails.weight || ''}
-                  onChange={(e) => updateFormData('packageDetails', 'weight', Number(e.target.value))}
-                  fullWidth
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Descripción
-                </label>
-                <textarea
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring focus:ring-primary-500 focus:ring-opacity-50"
-                  rows={3}
-                  placeholder="Descripción detallada del contenido"
-                  value={formData.packageDetails.description}
-                  onChange={(e) => updateFormData('packageDetails', 'description', e.target.value)}
-                ></textarea>
+              {packages.map((pkg, index) => (
+                <Card key={pkg.id} className="p-4 border border-gray-200">
+                  <div className="flex justify-between items-start mb-4">
+                    <h3 className="font-medium text-gray-900">
+                      Paquete {index + 1}
+                    </h3>
+                    {packages.length > 1 && (
+                      <Button
+                        variant="ghost"
+                        onClick={() => removePackage(pkg.id)}
+                        icon={<Trash2 size={18} />}
+                      >
+                        Eliminar
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <Input
+                      label="Ancho (cm)"
+                      type="number"
+                      value={pkg.width || ''}
+                      onChange={(e) => updatePackage(index, 'width', Number(e.target.value))}
+                      fullWidth
+                    />
+                    
+                    <Input
+                      label="Alto (cm)"
+                      type="number"
+                      value={pkg.height || ''}
+                      onChange={(e) => updatePackage(index, 'height', Number(e.target.value))}
+                      fullWidth
+                    />
+                    
+                    <Input
+                      label="Largo (cm)"
+                      type="number"
+                      value={pkg.length || ''}
+                      onChange={(e) => updatePackage(index, 'length', Number(e.target.value))}
+                      fullWidth
+                    />
+                    
+                    <Input
+                      label="Peso (kg)"
+                      type="number"
+                      value={pkg.weight || ''}
+                      onChange={(e) => updatePackage(index, 'weight', Number(e.target.value))}
+                      fullWidth
+                    />
+                  </div>
+                  <div className="mt-4">
+                    <Input
+                      label="Descripción"
+                      type="text"
+                      value={pkg.description}
+                      onChange={(e) => updatePackage(index, 'description', e.target.value)}
+                      fullWidth
+                    />
+                  </div>
+                </Card>
+              ))}
+
+              <div className="mt-6 p-4 bg-gray-50 rounded-md">
+                <div className="flex items-center space-x-2 mb-4">
+                  <input
+                    type="checkbox"
+                    id="shared-freight"
+                    checked={isShared}
+                    onChange={(e) => setIsShared(e.target.checked)}
+                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <label htmlFor="shared-freight" className="text-sm text-gray-700">
+                    Permitir que otros usuarios se unan a este flete
+                  </label>
+                </div>
               </div>
             </div>
           </motion.div>
@@ -402,7 +488,7 @@ const NewFreightRequest: React.FC = () => {
                 label="Fecha deseada"
                 type="date"
                 value={formData.requestedDate}
-                onChange={(e) => updateFormData('', 'requestedDate', e.target.value)}
+                onChange={(e) => updateFormData('requestedDate', '', e.target.value)}
                 fullWidth
                 icon={<Calendar size={18} />}
               />
@@ -428,40 +514,56 @@ const NewFreightRequest: React.FC = () => {
             <h2 className="text-xl font-semibold text-gray-900 mb-6">
               Revisión y Confirmación
             </h2>
-            
             <div className="space-y-6">
               <div className="bg-gray-50 p-4 rounded-md">
                 <h3 className="font-medium text-gray-900 mb-2">Origen</h3>
                 <p className="text-gray-700">{formData.pickup.address}</p>
                 <p className="text-gray-700">{formData.pickup.city}</p>
               </div>
-              
               <div className="bg-gray-50 p-4 rounded-md">
                 <h3 className="font-medium text-gray-900 mb-2">Destino</h3>
                 <p className="text-gray-700">{formData.delivery.address}</p>
                 <p className="text-gray-700">{formData.delivery.city}</p>
               </div>
-              
               <div className="bg-gray-50 p-4 rounded-md">
-                <h3 className="font-medium text-gray-900 mb-2">Detalles del Paquete</h3>
-                <p className="text-gray-700">
-                  {formData.packageDetails.width} x {formData.packageDetails.height} x {formData.packageDetails.length} cm, 
-                  {formData.packageDetails.weight} kg
-                </p>
-                <p className="text-gray-700 mt-1">{formData.packageDetails.description}</p>
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">Detalles de los Paquetes</h2>
+                {packages.map((pkg, idx) => (
+                  <div key={pkg.id} className="mb-4 p-4 bg-gray-50 rounded-md">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-2">
+                      <div>
+                        <p className="text-sm text-gray-500">Ancho</p>
+                        <p className="font-medium text-gray-900">{pkg.width} cm</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">Alto</p>
+                        <p className="font-medium text-gray-900">{pkg.height} cm</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">Largo</p>
+                        <p className="font-medium text-gray-900">{pkg.length} cm</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">Peso</p>
+                        <p className="font-medium text-gray-900">{pkg.weight} kg</p>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500 mb-1">Descripción</p>
+                      <p className="text-gray-900">{pkg.description}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
-              
               <div className="bg-gray-50 p-4 rounded-md">
                 <h3 className="font-medium text-gray-900 mb-2">Fecha Solicitada</h3>
                 <p className="text-gray-700">
-                  {new Date(formData.requestedDate).toLocaleDateString('es-ES', {
+                  {new Date(formData.requestedDate).toLocaleDateString('es-AR', {
                     day: 'numeric',
                     month: 'long',
                     year: 'numeric',
                   })}
                 </p>
               </div>
-              
               <div className="bg-primary-50 p-4 rounded-md">
                 <h3 className="font-medium text-primary-900 mb-2">Resumen de Precio</h3>
                 <div className="flex justify-between text-gray-700">

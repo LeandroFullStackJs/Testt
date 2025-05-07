@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, MapPin, Package, ArrowRight, Clock, Truck, BarChart3 } from 'lucide-react';
+import { Plus, MapPin, Package, ArrowRight, Clock, Truck, BarChart3, Users } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import { useAuth } from '../hooks/useAuth';
@@ -31,6 +31,14 @@ const Dashboard: React.FC = () => {
     return false;
   });
   
+  // Calcula la cantidad de fletes compartidos disponibles para unirse
+  const sharedFreightsAvailable = freightRequests.filter(fr =>
+    fr.isShared &&
+    fr.customerId !== user?.id &&
+    fr.currentPackages < fr.maxPackages &&
+    !(fr.packages || []).some(pkg => pkg.ownerId === user?.id)
+  ).length;
+  
   return (
     <div className="space-y-8 pb-16 md:pb-0">
       {/* Welcome section */}
@@ -45,22 +53,25 @@ const Dashboard: React.FC = () => {
               {isTransporter && '¿Listo para aceptar nuevos fletes?'}
             </p>
           </div>
-          
-          {isCustomer && (
-            <Link to="/freight/new">
-              <Button variant="primary" icon={<Plus size={18} />}>
-                Solicitar nuevo flete
-              </Button>
-            </Link>
-          )}
-          
-          {isTransporter && (
-            <Link to="/freight">
-              <Button variant="primary" icon={<Package size={18} />}>
-                Ver solicitudes disponibles
-              </Button>
-            </Link>
-          )}
+          <div className="flex flex-col md:flex-row gap-2 md:gap-4">
+            {isCustomer && (
+              <>
+                <Link to="/freight/new">
+                  <Button variant="primary" icon={<Plus size={18} />}>Solicitar nuevo flete</Button>
+                </Link>
+                <Link to="/freight">
+                  <Button variant="outline" icon={<Users size={18} />}>
+                    Unirse a un flete compartido{sharedFreightsAvailable > 0 ? ` (${sharedFreightsAvailable})` : ''}
+                  </Button>
+                </Link>
+              </>
+            )}
+            {isTransporter && (
+              <Link to="/freight">
+                <Button variant="primary" icon={<Package size={18} />}>Ver solicitudes disponibles</Button>
+              </Link>
+            )}
+          </div>
         </div>
       </div>
       
@@ -221,6 +232,14 @@ const Dashboard: React.FC = () => {
               <p className="font-medium text-gray-900">Soporte</p>
             </Link>
           </Card>
+          
+          <Link to="/freight" className="block">
+            <div className="bg-blue-50 hover:bg-blue-100 transition rounded-lg p-4 flex flex-col items-center justify-center h-full">
+              <Users size={32} className="text-blue-600 mb-2" />
+              <span className="font-medium text-blue-900">Fletes Compartidos</span>
+              <span className="text-xs text-blue-700 mt-1">Ver y unirte a fletes de otros</span>
+            </div>
+          </Link>
         </div>
       </div>
     </div>

@@ -18,6 +18,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Inicializa la lista de usuarios en localStorage si no existe
+    const storedUsers = localStorage.getItem('fleteshare_users');
+    if (!storedUsers) {
+      localStorage.setItem('fleteshare_users', JSON.stringify(mockUsers));
+    }
     // Check if user is logged in
     const storedUser = localStorage.getItem('fleteshare_user');
     if (storedUser) {
@@ -28,19 +33,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
-    
     try {
-      // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock login logic
-      const matchedUser = mockUsers.find(u => u.email === email);
-      
+      // Buscar en usuarios guardados
+      const storedUsers = JSON.parse(localStorage.getItem('fleteshare_users') || '[]');
+      const matchedUser = storedUsers.find((u: any) => u.email === email);
       if (!matchedUser) {
         throw new Error('Usuario no encontrado');
       }
-      
-      // In a real app, you would verify the password here
       setUser(matchedUser);
       localStorage.setItem('fleteshare_user', JSON.stringify(matchedUser));
     } catch (error) {
@@ -53,12 +53,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const register = async (name: string, email: string, password: string, role: UserRole) => {
     setIsLoading(true);
-    
     try {
-      // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock registration
+      const storedUsers = JSON.parse(localStorage.getItem('fleteshare_users') || '[]');
+      // Evitar duplicados
+      if (storedUsers.some((u: any) => u.email === email)) {
+        throw new Error('El email ya está registrado');
+      }
       const newUser: User = {
         id: `user-${Date.now()}`,
         name,
@@ -69,7 +70,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ratingsCount: 0,
         createdAt: new Date().toISOString(),
       };
-      
+      const updatedUsers = [...storedUsers, newUser];
+      localStorage.setItem('fleteshare_users', JSON.stringify(updatedUsers));
       setUser(newUser);
       localStorage.setItem('fleteshare_user', JSON.stringify(newUser));
     } catch (error) {

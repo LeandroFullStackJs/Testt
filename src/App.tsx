@@ -19,6 +19,7 @@ import Profile from './pages/Profile';
 import Chat from './pages/Chat';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import NotFound from './pages/NotFound';
+import JoinFreight from './pages/freight/JoinFreight';
 
 // Route Guards
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
@@ -108,6 +109,7 @@ function App() {
           <Route index element={<FreightRequests />} />
           <Route path="new" element={<NewFreightRequest />} />
           <Route path=":id" element={<FreightDetails />} />
+          <Route path=":id/join" element={<JoinFreight />} />
         </Route>
       </Route>
 
