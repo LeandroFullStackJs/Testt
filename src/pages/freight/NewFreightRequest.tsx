@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { MapPin, ArrowLeft, ArrowRight, Package, Calendar, DollarSign, Plus, Trash2 } from 'lucide-react';
 import Input from '../../components/ui/Input';
@@ -8,6 +8,7 @@ import { useFreight } from '../../hooks/useFreight';
 import { FreightRequest, PackageItem } from '../../types';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../hooks/useAuth';
+import { toast } from 'react-toastify';
 
 type FormStep = 'locations' | 'package' | 'schedule' | 'review';
 
@@ -56,6 +57,13 @@ const NewFreightRequest: React.FC = () => {
   const [packages, setPackages] = useState<PackageItem[]>([]);
   const [isShared, setIsShared] = useState(false);
   const [maxPackages, setMaxPackages] = useState(1);
+  
+  useEffect(() => {
+    if (user?.role === 'transporter') {
+      toast.error('Los transportistas no pueden crear fletes.');
+      navigate('/dashboard');
+    }
+  }, [user, navigate]);
   
   const updateFormData = (
     field: keyof FormData,
@@ -179,15 +187,31 @@ const NewFreightRequest: React.FC = () => {
 
   // Función para agregar un nuevo paquete
   const addPackage = () => {
+    const volume =
+      formData.packageDetails.width *
+      formData.packageDetails.height *
+      formData.packageDetails.length;
+    const space = volume / 1000000; // cm³ a m³
+    const distance = Math.round(Math.random() * 25 + 5); // 5-30km
+    const basePrice = 500;
+    const distancePrice = distance * 30;
+    const spacePrice = space * 5;
+    const price = Math.round(basePrice + distancePrice + spacePrice);
     const newPackage: PackageItem = {
       id: `package-${Date.now()}`,
-      width: 0,
-      height: 0,
-      length: 0,
-      weight: 0,
-      description: '',
+      width: formData.packageDetails.width,
+      height: formData.packageDetails.height,
+      length: formData.packageDetails.length,
+      weight: formData.packageDetails.weight,
+      description: formData.packageDetails.description,
       ownerId: user?.id || '',
       ownerName: user?.name || '',
+      distance,
+      space,
+      price,
+      paymentStatus: 'pending',
+      paymentMethod: null,
+      paymentProof: null,
     };
     setPackages([...packages, newPackage]);
   };
@@ -204,6 +228,10 @@ const NewFreightRequest: React.FC = () => {
       )
     );
   };
+
+  if (user?.role === 'transporter') {
+    return null;
+  }
 
   return (
     <div className="max-w-2xl mx-auto pb-16 md:pb-0 px-4 sm:px-6">

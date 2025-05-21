@@ -164,8 +164,8 @@ const Profile: React.FC = () => {
                   <p className="text-sm text-gray-500 mr-2">Calificación</p>
                   <div className="flex items-center">
                     <Star size={16} className="text-warning-500 fill-current" />
-                    <span className="font-medium text-gray-900 ml-1">{user.rating.toFixed(1)}</span>
-                    <span className="text-gray-500 text-sm ml-1">({user.ratingsCount} reseñas)</span>
+                    <span className="font-medium text-gray-900 ml-1">{receivedReviews.length ? (receivedReviews.reduce((acc, r) => acc + r.rating, 0) / receivedReviews.length).toFixed(1) : '0.0'}</span>
+                    <span className="text-gray-500 text-sm ml-1">({receivedReviews.length} reseñas)</span>
                   </div>
                 </div>
               </>

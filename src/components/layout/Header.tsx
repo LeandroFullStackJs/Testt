@@ -4,6 +4,19 @@ import { Truck, Menu, X, Bell, User } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { motion, AnimatePresence } from 'framer-motion';
 
+type Notification = {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  createdAt: string;
+  read: boolean;
+};
+
+const mockNotifications: Notification[] = [
+  // { id: '1', userId: '123', title: 'Paquete entregado', message: 'Tu paquete ha sido entregado.', createdAt: new Date().toISOString(), read: false },
+];
+
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -22,6 +35,9 @@ const Header: React.FC = () => {
     navigate('/login');
   };
   
+  const [notifications] = useState<Notification[]>(mockNotifications);
+  const unreadCount = notifications.filter(n => !n.read && n.userId === user?.id).length;
+  
   return (
     <header className="bg-white shadow-sm">
       <nav className="container mx-auto px-4 sm:px-6 py-4">
@@ -34,12 +50,17 @@ const Header: React.FC = () => {
           
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
-            <Link to="/" className="text-gray-700 hover:text-primary-600 transition">
-              Inicio
-            </Link>
-            <Link to="/about" className="text-gray-700 hover:text-primary-600 transition">
-              Cómo Funciona
-            </Link>
+            <Link to="/" className="text-gray-700 hover:text-primary-600 transition">Inicio</Link>
+            <Link to="/faq" className="text-gray-700 hover:text-primary-600 transition">Preguntas Frecuentes</Link>
+            <Link to="/support" className="text-gray-700 hover:text-primary-600 transition">Soporte</Link>
+            {isAuthenticated && (
+              <Link to="/notifications" className="relative text-gray-500 hover:text-primary-600 transition">
+                <Bell size={22} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-2 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5">{unreadCount}</span>
+                )}
+              </Link>
+            )}
             {isAuthenticated ? (
               <>
                 <Link to="/dashboard" className="text-gray-700 hover:text-primary-600 transition">
@@ -126,6 +147,9 @@ const Header: React.FC = () => {
               <div className="relative mr-4">
                 <Link to="/notifications" className="text-gray-500 hover:text-primary-600">
                   <Bell size={24} />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-2 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5">{unreadCount}</span>
+                  )}
                 </Link>
               </div>
             )}
@@ -149,18 +173,9 @@ const Header: React.FC = () => {
               className="md:hidden mt-4 py-2"
             >
               <div className="flex flex-col space-y-4">
-                <Link 
-                  to="/" 
-                  className="text-gray-700 hover:text-primary-600 py-2 transition"
-                >
-                  Inicio
-                </Link>
-                <Link 
-                  to="/about" 
-                  className="text-gray-700 hover:text-primary-600 py-2 transition"
-                >
-                  Cómo Funciona
-                </Link>
+                <Link to="/" className="text-gray-700 hover:text-primary-600 py-2 transition">Inicio</Link>
+                <Link to="/faq" className="text-gray-700 hover:text-primary-600 py-2 transition">Preguntas Frecuentes</Link>
+                <Link to="/support" className="text-gray-700 hover:text-primary-600 py-2 transition">Soporte</Link>
                 {isAuthenticated ? (
                   <>
                     <Link 
@@ -168,6 +183,12 @@ const Header: React.FC = () => {
                       className="text-gray-700 hover:text-primary-600 py-2 transition"
                     >
                       Dashboard
+                    </Link>
+                    <Link 
+                      to="/notifications" 
+                      className="text-gray-700 hover:text-primary-600 py-2 transition flex items-center gap-2"
+                    >
+                      <Bell size={18} /> Notificaciones
                     </Link>
                     <Link 
                       to="/profile" 

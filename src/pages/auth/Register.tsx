@@ -17,6 +17,9 @@ const Register: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
+  const [license, setLicense] = useState<File | null>(null);
+  const [vehicleSpace, setVehicleSpace] = useState('');
+  const [vehicleWeight, setVehicleWeight] = useState('');
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,6 +27,17 @@ const Register: React.FC = () => {
     if (password !== confirmPassword) {
       setError('Las contraseñas no coinciden');
       return;
+    }
+    
+    if (role === 'transporter') {
+      if (!license) {
+        setError('Debes subir una foto de tu licencia');
+        return;
+      }
+      if (!vehicleSpace || !vehicleWeight) {
+        setError('Debes completar los detalles del vehículo');
+        return;
+      }
     }
     
     setError('');
@@ -167,6 +181,47 @@ const Register: React.FC = () => {
             </div>
           </div>
         </div>
+        
+        {role === 'transporter' && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Foto de la licencia <span className="text-red-500">*</span></label>
+              <input
+                type="file"
+                accept="image/*"
+                required
+                onChange={e => setLicense(e.target.files && e.target.files[0] ? e.target.files[0] : null)}
+                className="block w-full text-sm text-gray-700 border border-gray-300 rounded-md p-2"
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Espacio máximo utilizable (m³ o litros) <span className="text-red-500">*</span></label>
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={vehicleSpace}
+                  onChange={e => setVehicleSpace(e.target.value)}
+                  required
+                  className="block w-full text-sm text-gray-700 border border-gray-300 rounded-md p-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Peso máximo utilizable (kg) <span className="text-red-500">*</span></label>
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={vehicleWeight}
+                  onChange={e => setVehicleWeight(e.target.value)}
+                  required
+                  className="block w-full text-sm text-gray-700 border border-gray-300 rounded-md p-2"
+                />
+              </div>
+            </div>
+          </>
+        )}
         
         <div>
           <Button

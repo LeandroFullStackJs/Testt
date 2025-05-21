@@ -10,9 +10,13 @@ export interface User {
   rating: number;
   ratingsCount: number;
   createdAt: string;
+  address?: string;
+  location?: Location;
 }
 
 export type FreightStatus = 'pending' | 'confirmed' | 'in_transit' | 'delivered' | 'cancelled';
+
+export type DeliveryStatus = 'pending' | 'in_transit' | 'delivered';
 
 export interface PackageItem {
   id: string;
@@ -24,6 +28,22 @@ export interface PackageItem {
   photos?: string[];
   ownerId: string;
   ownerName: string;
+  deliveryStatus?: DeliveryStatus;
+  distance?: number;
+  space?: number;
+  price?: number;
+  paymentStatus?: 'pending' | 'paid' | 'confirmed';
+  paymentMethod?: 'cash' | 'bank' | null;
+  paymentProof?: string | null;
+}
+
+export interface Location {
+  latitude: number;
+  longitude: number;
+  address: string;
+  city: string;
+  state?: string;
+  country?: string;
 }
 
 export interface FreightRequest {
@@ -35,22 +55,8 @@ export interface FreightRequest {
   transporterName?: string;
   transporterAvatar?: string;
   status: FreightStatus;
-  pickup: {
-    address: string;
-    city: string;
-    coordinates?: {
-      lat: number;
-      lng: number;
-    };
-  };
-  delivery: {
-    address: string;
-    city: string;
-    coordinates?: {
-      lat: number;
-      lng: number;
-    };
-  };
+  pickup: Location;
+  delivery: Location;
   packageDetails: {
     width: number;
     height: number;
@@ -69,6 +75,14 @@ export interface FreightRequest {
   maxPackages: number;
   currentPackages: number;
   sharedBy?: string[];
+  participants?: Array<{
+    id: string;
+    name: string;
+    address: string;
+    city: string;
+    latitude: number;
+    longitude: number;
+  }>;
 }
 
 export interface Message {

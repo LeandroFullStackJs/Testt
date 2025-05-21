@@ -12,7 +12,7 @@ interface FreightContextType {
   createFreightRequest: (freightRequest: Omit<FreightRequest, 'id' | 'status' | 'customerName' | 'customerAvatar' | 'createdAt'>) => Promise<FreightRequest>;
   updateFreightStatus: (id: string, status: FreightStatus) => Promise<FreightRequest>;
   acceptFreightRequest: (id: string) => Promise<FreightRequest>;
-  joinFreightRequest: (freightId: string) => Promise<void>;
+  joinFreightRequest: (freightId: string) => Promise<FreightRequest>;
   joiningFreightId: string | null;
   reviews: Review[];
   addReview: (review: Omit<Review, 'id' | 'createdAt'>) => void;
@@ -157,14 +157,63 @@ export const FreightProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const joinFreightRequest = async (freightId: string) => {
-    if (!user) throw new Error('Debes iniciar sesión para unirte a un flete');
-    const index = freightRequests.findIndex(f => f.id === freightId);
-    if (index === -1) throw new Error('Flete no encontrado');
-    const freight = freightRequests[index];
-    if (!freight.isShared || freight.currentPackages >= freight.maxPackages) {
-      throw new Error('No se puede unir a este flete');
+    setIsLoading(true);
+    try {
+      if (!user) throw new Error('Debes iniciar sesión para unirte a un flete');
+      
+      const index = freightRequests.findIndex(f => f.id === freightId);
+      if (index === -1) throw new Error('Flete no encontrado');
+      
+      const freight = freightRequests[index];
+      
+      // Validaciones
+      if (!freight.isShared) {
+        throw new Error('Este flete no permite compartir');
+      }
+      if (freight.currentPackages >= freight.maxPackages) {
+        throw new Error('El flete ya está completo');
+      }
+      if (freight.status !== 'pending') {
+        throw new Error('No se puede unir a un flete que ya está en proceso');
+      }
+      if (freight.customerId === user.id) {
+        throw new Error('No puedes unirte a tu propio flete');
+      }
+      if ((freight.sharedBy || []).includes(user.id)) {
+        throw new Error('Ya te has unido a este flete');
+      }
+      // Simular llamada a API
+      await new Promise(resolve => setTimeout(resolve, 500));
+      // Actualizar el flete correctamente
+      const updatedFreight = {
+        ...freight,
+        currentPackages: freight.currentPackages + 1,
+        sharedBy: [...(freight.sharedBy || []), user.id],
+        participants: [
+          ...(freight.participants || []),
+          {
+            id: user.id,
+            name: user.name,
+            address: user.address || '',
+            city: user.location?.city || '',
+            latitude: user.location?.latitude || 0,
+            longitude: user.location?.longitude || 0
+          }
+        ]
+      };
+      const updatedList = [...freightRequests];
+      updatedList[index] = updatedFreight;
+      setFreightRequests(updatedList);
+      setJoiningFreightId(null);
+      return updatedFreight;
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Error al unirse al flete');
+      setError(error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+      setJoiningFreightId(null);
     }
-    setJoiningFreightId(freightId);
   };
 
   const addReview = (review: Omit<Review, 'id' | 'createdAt'>) => {

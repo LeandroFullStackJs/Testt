@@ -7,6 +7,7 @@ import FreightCard from '../../components/freight/FreightCard';
 import { useFreight } from '../../hooks/useFreight';
 import { useAuth } from '../../hooks/useAuth';
 import { FreightStatus, FreightRequest } from '../../types';
+import { toast } from 'react-toastify';
 
 type SortOption = 'recent' | 'price-low' | 'price-high' | 'distance';
 
@@ -18,6 +19,7 @@ const FreightRequests: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<FreightStatus | 'all'>('all');
   const [sortOption, setSortOption] = useState<SortOption>('recent');
   const [showFilters, setShowFilters] = useState(false);
+  const [joiningId, setJoiningId] = useState<string | null>(null);
   
   // Divide los fletes en dos listas para el cliente
   let ownFreights: FreightRequest[] = [];
@@ -103,11 +105,14 @@ const FreightRequests: React.FC = () => {
   };
 
   const handleJoinFreight = async (freightId: string) => {
+    setJoiningId(freightId);
     try {
       await joinFreightRequest(freightId);
       navigate(`/freight/${freightId}/join`);
     } catch (error) {
-      console.error('Error al unirse al flete:', error);
+      toast.error(error instanceof Error ? error.message : 'Error al unirse al flete');
+    } finally {
+      setJoiningId(null);
     }
   };
   
@@ -124,9 +129,11 @@ const FreightRequests: React.FC = () => {
               : 'Explora las solicitudes disponibles para aceptar'}
           </p>
         </div>
-        <Link to="/freight/new">
-          <Button variant="primary" icon={<Plus size={18} />}>Solicitar nuevo flete</Button>
-        </Link>
+        {user?.role === 'customer' && (
+          <Link to="/freight/new">
+            <Button variant="primary" icon={<Plus size={18} />}>Solicitar nuevo flete</Button>
+          </Link>
+        )}
       </div>
       <div className="bg-white rounded-lg shadow-md p-6">
         <div className="flex flex-col md:flex-row gap-4 mb-4">
@@ -234,6 +241,8 @@ const FreightRequests: React.FC = () => {
                     key={freight.id} 
                     freight={freight}
                     onJoinFreight={freight.isShared ? () => handleJoinFreight(freight.id) : undefined}
+                    isParticipant={freight.sharedBy?.includes(user.id)}
+                    isLoading={joiningId === freight.id}
                   />
                 ))}
               </div>

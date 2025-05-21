@@ -66,6 +66,12 @@ const Footer: React.FC = () => {
             <Link to="/privacy" className="text-gray-500 hover:text-white text-sm transition-colors">
               Política de Privacidad
             </Link>
+            <Link to="/faq" className="text-gray-500 hover:text-white text-sm transition-colors">
+              Preguntas Frecuentes
+            </Link>
+            <Link to="/support" className="text-gray-500 hover:text-white text-sm transition-colors">
+              Soporte
+            </Link>
           </div>
         </div>
       </div>

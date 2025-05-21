@@ -14,9 +14,10 @@ interface FreightCardProps {
   onJoinFreight?: () => void;
   isOwner?: boolean;
   isParticipant?: boolean;
+  isLoading?: boolean;
 }
 
-const FreightCard: React.FC<FreightCardProps> = ({ freight, onJoinFreight, isOwner, isParticipant }) => {
+const FreightCard: React.FC<FreightCardProps> = ({ freight, onJoinFreight, isOwner, isParticipant, isLoading }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   
@@ -111,11 +112,13 @@ const FreightCard: React.FC<FreightCardProps> = ({ freight, onJoinFreight, isOwn
               <div className="text-sm text-gray-600">
                 {freight.currentPackages} de {freight.maxPackages} paquetes
               </div>
-              {onJoinFreight && user?.role === 'customer' && freight.customerId !== user.id && freight.currentPackages < freight.maxPackages && (
+              {onJoinFreight && user?.role === 'customer' && freight.customerId !== user.id && freight.currentPackages < freight.maxPackages && !isParticipant && (
                 <Button
                   variant="primary"
                   size="sm"
                   onClick={e => { e.stopPropagation(); onJoinFreight(); }}
+                  isLoading={isLoading}
+                  disabled={isLoading}
                 >
                   Unirse al Flete
                 </Button>

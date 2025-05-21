@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, MapPin, Package, ArrowRight, Clock, Truck, BarChart3, Users } from 'lucide-react';
 import Button from '../components/ui/Button';
@@ -10,6 +10,7 @@ import FreightCard from '../components/freight/FreightCard';
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const { freightRequests, isLoading } = useFreight();
+  const [notifications, setNotifications] = useState<any[]>([]); // Simulación, reemplazar por contexto global si lo tienes
   const isCustomer = user?.role === 'customer';
   const isTransporter = user?.role === 'transporter';
   
@@ -242,6 +243,34 @@ const Dashboard: React.FC = () => {
           </Link>
         </div>
       </div>
+      
+      {/* Notifications section */}
+      <Card className="p-6 mb-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold text-gray-900">Notificaciones</h2>
+          <span className="text-xs text-primary-600 font-bold">{notifications.filter(n => !n.read && n.userId === user?.id).length} sin leer</span>
+        </div>
+        <div className="space-y-2">
+          {notifications.filter(n => n.userId === user?.id).length === 0 ? (
+            <div className="text-gray-500">No tienes notificaciones.</div>
+          ) : (
+            notifications.filter(n => n.userId === user?.id).map(n => (
+              <div key={n.id} className={`p-3 rounded-md ${n.read ? 'bg-gray-50' : 'bg-blue-50 border-l-4 border-blue-400'}`}>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <span className="font-semibold">{n.title}</span>
+                    <p className="text-sm text-gray-700">{n.message}</p>
+                    <span className="text-xs text-gray-400">{new Date(n.createdAt).toLocaleString()}</span>
+                  </div>
+                  {!n.read && (
+                    <Button size="xs" variant="outline" onClick={() => setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x))}>Marcar como leída</Button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </Card>
     </div>
   );
 };

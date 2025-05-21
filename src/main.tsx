@@ -5,13 +5,16 @@ import App from './App';
 import './index.css';
 import { AuthProvider } from './contexts/AuthContext';
 import { FreightProvider } from './contexts/FreightContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <AuthProvider>
         <FreightProvider>
-          <App />
+          <NotificationProvider>
+            <App />
+          </NotificationProvider>
         </FreightProvider>
       </AuthProvider>
     </BrowserRouter>
