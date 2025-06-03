@@ -309,6 +309,9 @@ const FreightDetails: React.FC = () => {
   const myTotal = myPackages.reduce((acc, pkg) => acc + (pkg.price || 0), 0);
   const isMyFreight = user?.id === freight.customerId;
 
+  // Calcular el total para el transportista (suma de todos los paquetes activos)
+  const transporterTotal = sortedPackages.reduce((acc, pkg) => acc + (pkg.price || 0), 0);
+
   return (
     <div className="space-y-6 pb-16 md:pb-0">
       {/* Header */}
@@ -560,6 +563,22 @@ const FreightDetails: React.FC = () => {
                   <p className="font-bold text-xl text-primary-600">${freight.price.toFixed(2)}</p>
                 </div>
               </>
+            ) : isTransporter ? (
+              <>
+                <div className="flex justify-between items-center mb-2">
+                  <p className="text-gray-600">Total bruto</p>
+                  <p className="font-medium text-gray-900">${transporterTotal.toFixed(2)}</p>
+                </div>
+                <div className="flex justify-between items-center mb-2">
+                  <p className="text-gray-600">Comisión de servicio (15%)</p>
+                  <p className="font-medium text-gray-900">-${(transporterTotal * 0.15).toFixed(2)}</p>
+                </div>
+                <div className="flex justify-between items-center pt-4 border-t border-gray-100">
+                  <p className="font-semibold text-gray-900">Total a recibir</p>
+                  <p className="font-bold text-xl text-primary-600">${(transporterTotal * 0.85).toFixed(2)}</p>
+                </div>
+                <div className="text-xs text-gray-500">(Suma de todos los paquetes activos de los clientes)</div>
+              </>
             ) : (
               <>
                 <div className="flex justify-between items-center mb-2">
@@ -663,17 +682,29 @@ const FreightDetails: React.FC = () => {
                 </Button>
               )}
               
-              {isDelivered && !hasReviewedTransporter && (isCustomer || (freight.packages || []).some(pkg => pkg.ownerId === user?.id)) && (
-                <Button variant="outline" fullWidth icon={<Star size={18} />} onClick={() => { setShowReviewModal(true); setReviewTarget(freight.transporterId || null); setReviewRole('transporter'); }}>
-                  Calificar al transportista
-                </Button>
+              {/* Solo mostrar botones de reseña cuando el flete esté entregado y todos los paquetes estén entregados */}
+              {isDelivered && sortedPackages.every(pkg => pkg.deliveryStatus === 'delivered') && (
+                <>
+                  {!hasReviewedTransporter && (isCustomer || (freight.packages || []).some(pkg => pkg.ownerId === user?.id)) && (
+                    <Button variant="outline" fullWidth icon={<Star size={18} />} onClick={() => { setShowReviewModal(true); setReviewTarget(freight.transporterId || null); setReviewRole('transporter'); }}>
+                      Calificar al transportista
+                    </Button>
+                  )}
+                  
+                  {isTransporter && isDelivered && sortedPackages.every(pkg => pkg.deliveryStatus === 'delivered') && (
+                    <>
+                      {uniqueClients
+                        .filter(cid => cid !== user?.id) // todos los clientes menos el transportista
+                        .filter(cid => !reviews.some(r => r.freightId === freight.id && r.authorId === user?.id && r.targetId === cid && r.role === 'customer'))
+                        .map(cid => (
+                          <Button key={cid} variant="outline" fullWidth icon={<Star size={18} />} onClick={() => { setShowReviewModal(true); setReviewTarget(cid || null); setReviewRole('customer'); }}>
+                            Calificar a {uniqueClientNames[uniqueClients.indexOf(cid)]}
+                          </Button>
+                        ))}
+                    </>
+                  )}
+                </>
               )}
-              
-              {isDelivered && isTransporter && !hasReviewedAllCustomers && uniqueClients.filter(cid => cid !== freight.transporterId).map(cid => (
-                <Button key={cid} variant="outline" fullWidth icon={<Star size={18} />} onClick={() => { setShowReviewModal(true); setReviewTarget(cid || null); setReviewRole('customer'); }}>
-                  Calificar a {uniqueClientNames[uniqueClients.indexOf(cid)]}
-                </Button>
-              ))}
               
               {canCancel && (
                 <Button 
